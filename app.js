@@ -1,34 +1,52 @@
-// Import Express.js
 const express = require('express');
-
-// Create an Express app
 const app = express();
-
-// Middleware to parse JSON bodies
-app.use(express.json());
-
-// Set port and verify_token
 const port = process.env.PORT || 3000;
-const verifyToken = process.env.VERIFY_TOKEN;
 
-// Route for GET requests
-app.get('/', (req, res) => {
-  const { 'hub.mode': mode, 'hub.challenge': challenge, 'hub.verify_token': token } = req.query;
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// CORS izinleri
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  next();
+});
+
+// Webhook verification endpoint - GOLDEX token ile
+app.get('/webhook', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  const verifyToken = process.env.VERIFY_TOKEN || 'GOLDEX';
+
+  console.log('Webhook verification attempt:', { mode, token, verifyToken });
 
   if (mode === 'subscribe' && token === verifyToken) {
-    console.log('WEBHOOK VERIFIED');
+    console.log('WEBHOOK_VERIFIED');
     res.status(200).send(challenge);
   } else {
-    res.status(403).end();
+    console.log('Verification failed');
+    res.status(403).send('Forbidden');
   }
 });
 
-// Route for POST requests
-app.post('/', (req, res) => {
-  const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
-  console.log(`\n\nWebhook received ${timestamp}\n`);
-  console.log(JSON.stringify(req.body, null, 2));
-  res.status(200).end();
+// Webhook endpoint for receiving messages
+app.post('/webhook', (req, res) => {
+  console.log('Received webhook POST:', JSON.stringify(req.body, null, 2));
+  res.status(200).json({ status: 'EVENT_RECEIVED' });
+});
+
+// Ana sayfa
+app.get('/', (req, res) => {
+  res.send('WhatsApp Webhook Server is running! Token: GOLDEX');
+});
+
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+  console.log(`Verify Token: ${process.env.VERIFY_TOKEN || 'GOLDEX'}`);
 });
 
 // Start the server
